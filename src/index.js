@@ -1,23 +1,23 @@
 // Variables in .env and .env.defaults will be added to process.env
-const dotenv = require("dotenv");
-dotenv.config({ path: ".env" });
-dotenv.config({ path: ".env.defaults" });
+import { config as dotenv_config } from 'dotenv';
+dotenv_config({ path: ".env" });
+dotenv_config({ path: ".env.defaults" });
 
 if (process.env.SENTRY_DSN) {
-  const Sentry = require("@sentry/node");
+  const Sentry = import("@sentry/node");
   Sentry.init({ dsn: process.env.SENTRY_DSN });
 }
 
-const moment = require('moment-timezone');
-const discord = require('discord.js');
-const schedule = require('node-schedule');
-const { Bridges, HubState } = require("./bridges.js");
-const { ReticulumClient } = require("./reticulum.js");
-const { TopicManager } = require("./topic.js");
-const { NotificationManager } = require("./notifications.js");
-const { HubStats } = require("./hub-stats.js");
-const { PresenceRollups } = require("./presence-rollups.js");
-const { StatsdClient } = require("./statsd-client.js");
+import moment from 'moment-timezone';
+import discord from 'discord.js';
+import schedule from 'node-schedule';
+import { Bridges, HubState } from "./bridges.js";
+import { ReticulumClient } from "./reticulum.js";
+import { TopicManager } from "./topic.js";
+import { NotificationManager } from "./notifications.js";
+import { HubStats } from "./hub-stats.js";
+import { PresenceRollups } from "./presence-rollups.js";
+import { StatsdClient } from "./statsd-client.js";
 
 // someday we will probably have different locales and timezones per server
 moment.tz.setDefault(process.env.TIMEZONE);
@@ -33,7 +33,7 @@ function logger(kind, msg, data) {
 
 const HOSTNAMES = process.env.HUBS_HOSTS.split(",");
 const MEDIA_DEDUPLICATE_MS = 60 * 60 * 1000; // 1 hour
-const IMAGE_URL_RE = /\.(png)|(gif)|(jpg)|(jpeg)$/;
+const IMAGE_URL_RE = /\.(png)|(gif)|(jpg)|(jpeg)$/i;
 const ACTIVE_ICON = "🔸";
 const ACTIVE_WEBHOOKS = {}; // { discordChId: webhook }
 const DISABLED_EVENTS = [ // only bother to disable processing on relatively high-volume events
@@ -518,9 +518,18 @@ async function start() {
   const discordClient = new discord.Client({
     shardId,
     shardCount,
-    messageCacheMaxSize: 1, // we have no use for manipulating historical messages
+    makeCache: discord.Options.cacheWithLimits({
+		MessageManager: 1,
+		PresenceManager: 0
+	}), // we have no use for manipulating historical messages
     disabledEvents: DISABLED_EVENTS,
-    disableEveryone: true
+    disableEveryone: true,
+    intents: [
+		discord.GatewayIntentBits.Guilds,
+		discord.GatewayIntentBits.GuildMessages,
+		discord.GatewayIntentBits.MessageContent,
+		discord.GatewayIntentBits.GuildWebhooks,
+	]
   });
 
   await connectToDiscord(discordClient, process.env.TOKEN);
@@ -541,7 +550,7 @@ async function start() {
   // one-time scan through all channels to look for existing bridges
   console.info(ts(`Scanning channel topics for Hubs hosts: ${HOSTNAMES.join(", ")}`));
   {
-    const textChannels = discordClient.channels.cache.array().filter(ch => ch.type === "text");
+    const textChannels = [...discordClient.channels.cache.values()].filter(ch => ch.type === "text");
     const candidateBridges = findBridges(topicManager, textChannels);
 
     for (const [key, channels] of candidateBridges.entries()) {
@@ -629,7 +638,7 @@ async function start() {
     }
   });
 
-  discordClient.on('webhookUpdate', (discordCh) => {
+  discordClient.on('webhooksUpdate', (discordCh) => {
     q.enqueue(async () => {
       const hubState = bridges.getHub(discordCh.id);
       if (hubState != null) {
@@ -715,7 +724,7 @@ async function start() {
         "of bot functionality, including guidelines on what permissions the bot needs, what kinds of bridging the bot can do, " +
         "and more about how the bot bridges channels to rooms. You can invite the bot to your own server at https://your-server.com/discord.";
 
-  discordClient.on('message', msg => {
+  discordClient.on('messageCreate', msg => {
     const args = msg.content.split(' ');
     const discordCh = msg.channel;
 
@@ -727,11 +736,20 @@ async function start() {
     q.enqueue(async () => {
 
       // don't process our own messages
+      console.log("ACTIVE_WEBHOOKS:", ACTIVE_WEBHOOKS);
+      console.log("discordCh.id:", discordCh.id);
+      console.log("msg.author.id:", msg.author.id);
+      console.log("discordClient.user.id:", discordClient.user.id);
       const activeWebhook = ACTIVE_WEBHOOKS[discordCh.id];
       if (msg.author.id === discordClient.user.id) {
         return;
       }
-      if (activeWebhook != null && msg.webhookID === activeWebhook.id) {
+      console.log("activeWebhook:", activeWebhook);
+      console.log("msg.webhookId:", msg.webhookId);
+      if (activeWebhook != null) {
+        console.log("activeWebhook.id:", activeWebhook.id);
+      }
+      if (activeWebhook != null && msg.webhookId === activeWebhook.id) {
         return;
       }
 
@@ -752,10 +770,13 @@ async function start() {
 
       // echo normal chat messages into the hub, if we're bridged to a hub
       const hubState = bridges.getHub(discordCh.id);
+      console.log("hubState:", hubState);
+      console.log("args[0]:", args[0]);
       if (args[0] !== "!hubs") {
         if (hubState == null) {
           return;
         }
+        console.log("msg:", msg);
         if (msg.cleanContent) { // could be blank if the message is e.g. only an attachment
           if (VERBOSE) {
             console.debug(ts(`Relaying chat message via ${formatDiscordCh(discordCh)} to hub ${hubState.id}.`));
@@ -810,12 +831,21 @@ async function start() {
         }
 
         const url = args.length > 2 ? args[2] : process.env.DEFAULT_SCENE_URL;
+        console.log("url:", url);
         const { sceneId } = topicManager.matchScene(url) || {};
+        console.log("sceneId:", sceneId);
         const name = args.length > 3 ? args[3] : getChannelBaseName(discordCh.name);
+        console.log("name:", name);
         const guildId = discordCh.guild.id;
+        console.log("guildId:", guildId);
         if (sceneId) { // !hubs create [scene URL] [name]
           const { url: hubUrl, hub_id: hubId } = await reticulumClient.createHubFromScene(name, sceneId);
+          console.log("hubUrl:", hubUrl);
+          console.log("hubId:", hubId);
+          console.log("url:", url);
+          console.log("hub_id:", hub_id);
           const updatedTopic = topicManager.addHub(discordCh.topic, hubUrl);
+          console.log("updatedTopic:", updatedTopic);
           if (await trySetTopic(discordCh, updatedTopic) != null) {
             return reticulumClient.bindHub(hubId, guildId, discordCh.id);
           }

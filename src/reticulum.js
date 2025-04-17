@@ -1,10 +1,10 @@
-const EventEmitter = require('events');
-const WebSocket = require('ws');
-const https = require('https');
-const phoenix = require("phoenix");
-const dotenv = require("dotenv");
-dotenv.config({ path: ".env" });
-dotenv.config({ path: ".env.defaults" });
+import EventEmitter from 'node:events';
+import WebSocket from 'ws';
+import https from 'https';
+import * as phoenix from "phoenix";
+import { config as dotenv_config } from 'dotenv';
+dotenv_config({ path: ".env" });
+dotenv_config({ path: ".env.defaults" });
 
 // Converts a Phoenix message push object into a promise that resolves when the push
 // is acknowledged by Reticulum or rejects when it times out or Reticulum produces an error.
@@ -22,7 +22,7 @@ function isDiscordBot(presenceMetadata) {
 }
 
 // State related to a single Hubs Phoenix channel subscription.
-class ReticulumChannel extends EventEmitter {
+export class ReticulumChannel extends EventEmitter {
 
   constructor(channel) {
     super();
@@ -171,7 +171,7 @@ class ReticulumChannel extends EventEmitter {
 }
 
 // State related to the Phoenix connection to Reticulum, independent of any particular Phoenix channel.
-class ReticulumClient {
+export class ReticulumClient {
 
   constructor(hostname, logger) {
     this.hostname = hostname;
@@ -191,12 +191,15 @@ class ReticulumClient {
 
   async _request(method, path, payload) {
     const endpoint = `https://${this.hostname}/api/v1/${path}`;
+    console.log("endpoint:", endpoint);
     const payloadJson = JSON.stringify(payload);
+    console.log("payloadJson:", payloadJson);
     const headers = {
       "content-type": "application/json",
       "x-ret-bot-access-key": process.env.RETICULUM_BOT_ACCESS_KEY,
       "content-length": Buffer.byteLength(payloadJson)
     };
+    console.log("headers:", headers);
 
     return new Promise((resolve, reject) => {
       const req = https.request(endpoint, { method, headers }, res => {
@@ -204,10 +207,12 @@ class ReticulumClient {
         res.on("data", chunk => json += chunk);
         res.on("end", () => {
           let result;
+          console.log("json:", json)
           try {
             result = JSON.parse(json);
           } catch(e) {
             // ignore json parsing errors
+            console.log("e:", e)
           }
           resolve(result);
         });
@@ -252,5 +257,3 @@ class ReticulumClient {
   }
 
 }
-
-module.exports = { ReticulumClient, ReticulumChannel };
