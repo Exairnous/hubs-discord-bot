@@ -26,7 +26,9 @@ export class TopicManager {
   }
 
   matchHub(topic) {
+    //console.log("topic:", topic);
     const [hubUrlStr, _host] = (topic || "").match(this.hubUrlRe) || [];
+    //console.log("hubUrlStr:", hubUrlStr);
     if (!hubUrlStr) {
       return null;
     }

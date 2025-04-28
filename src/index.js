@@ -219,7 +219,11 @@ async function tryGetOrCreateWebhook(discordCh) {
     if (existingHook != null) {
       return existingHook;
     } else {
-      const newHook = await discordCh.createWebhook(process.env.HUBS_HOOK, DUCK_AVATAR, "Bridging chat between Hubs and Discord.");
+      const newHook = await discordCh.createWebhook({
+        channel: discordCh.id,
+        name: process.env.HUBS_HOOK,
+        avatar: DUCK_AVATAR,
+        reason: "Bridging chat between Hubs and Discord."});
       discordCh.send(`Created a new webhook (${newHook.id}) to use for Hubs chat bridging.`);
       return newHook;
     }
@@ -228,6 +232,7 @@ async function tryGetOrCreateWebhook(discordCh) {
       throw e;
     } else {
       discordCh.send("Sorry, but you'll need to give me \"manage webhooks\" permission, or else I won't be able to use webhooks to bridge chat.");
+      console.log(e);
       return null;
     }
   }
@@ -386,12 +391,12 @@ async function establishBridging(hubState, bridges) {
           console.debug(msg, body);
         }
         if (type === "chat") {
-          webhook.send(body, { username: whom });
+          webhook.send({content: body, username: whom });
         } else if (type === "media") {
-          webhook.send(body.src, { username: whom });
+          webhook.send({content: body.src, username: whom });
         } else if (type === "photo" || type == "video") {
           // we like to just broadcast all camera photos and videos, without waiting for anyone to pin them
-          webhook.send(body.src, { username: whom });
+          webhook.send({content: body.src, username: whom });
         }
       }
     } catch (e) {
@@ -483,6 +488,7 @@ function findBridges(topicManager, channels) {
   const result = new Map();
   for (const discordCh of channels) {
     const { hubUrl, hubId } = topicManager.matchHub(discordCh.topic) || {};
+    console.log("hubUrl:", hubUrl);
     if (hubUrl != null) {
       const key = `${hubUrl.host} ${hubId}`;
       let bridgedChannels = result.get(key);
@@ -550,8 +556,11 @@ async function start() {
   // one-time scan through all channels to look for existing bridges
   console.info(ts(`Scanning channel topics for Hubs hosts: ${HOSTNAMES.join(", ")}`));
   {
-    const textChannels = [...discordClient.channels.cache.values()].filter(ch => ch.type === "text");
+    //console.log(discordClient.channels.cache.values());
+    const textChannels = [...discordClient.channels.cache.values()].filter(ch => ch.type === discord.ChannelType.GuildText);
+    //console.log("textChannels:", textChannels);
     const candidateBridges = findBridges(topicManager, textChannels);
+    //console.log("candidateBridges:", candidateBridges);
 
     for (const [key, channels] of candidateBridges.entries()) {
       const [host, hubId] = key.split(" ", 2);
@@ -575,16 +584,27 @@ async function start() {
         // evaluate permissions as a kind of short-circuiting because asking for pinned messages is slow
         // and it sucks to have to do it on literally every random channel in a server that the bot can read
         const perms = discordCh.permissionsFor(discordClient.user);
+        console.log("perms:", perms);
+        console.log("has ManageMessages", perms.has(discord.PermissionsBitField.Flags.ManageMessages));
+        console.log("has ViewChannel", perms.has(discord.PermissionsBitField.Flags.ViewChannel));
+        console.log("has ReadMessageHistory", perms.has(discord.PermissionsBitField.Flags.ReadMessageHistory));
+        console.log("has all", perms.has([
+          discord.PermissionsBitField.Flags.ManageMessages,
+          discord.PermissionsBitField.Flags.ViewChannel,
+          //discord.PermissionsBitField.Flags.ReadMessages,
+          discord.PermissionsBitField.Flags.ReadMessageHistory
+        ]));
         if (perms.has([
-          discord.Permissions.FLAGS.MANAGE_MESSAGES,
-          discord.Permissions.FLAGS.VIEW_CHANNEL,
-          discord.Permissions.FLAGS.READ_MESSAGES,
-          discord.Permissions.FLAGS.READ_MESSAGE_HISTORY
+          discord.PermissionsBitField.Flags.ManageMessages,
+          discord.PermissionsBitField.Flags.ViewChannel,
+          //discord.PermissionsBitField.Flags.ReadMessages,
+          discord.PermissionsBitField.Flags.ReadMessageHistory
         ])) {
           const pins = await discordCh.messages.fetchPinned();
           const notifications = pins.filter(msg => {
             return msg.author.id === discordClient.user.id && NotificationManager.parseTimestamp(msg).isValid();
           });
+          console.log("notifications:", notifications.values());
           for (const msg of notifications.values()) {
             notificationManager.add(NotificationManager.parseTimestamp(msg), msg);
           }
@@ -776,12 +796,22 @@ async function start() {
         if (hubState == null) {
           return;
         }
+
+        let author_name = msg.guild.members.cache.get(msg.author.id).nickname;
+        if (!author_name) {
+          author_name = msg.author.globalName;
+        }
+        if (!author_name) {
+          author_name = msg.author.username;
+        }
+        console.log("author_name:", author_name);
         console.log("msg:", msg);
         if (msg.cleanContent) { // could be blank if the message is e.g. only an attachment
           if (VERBOSE) {
             console.debug(ts(`Relaying chat message via ${formatDiscordCh(discordCh)} to hub ${hubState.id}.`));
           }
-          hubState.reticulumCh.sendMessage(msg.author.username, "chat", msg.cleanContent);
+          console.log(msg.author);
+          hubState.reticulumCh.sendMessage(author_name, "chat", msg.cleanContent);
         }
 
         // todo: we don't currently have any principled way of representing non-image attachments in hubs --
@@ -793,7 +823,7 @@ async function start() {
           if (VERBOSE) {
             console.debug(ts(`Relaying attachment via ${formatDiscordCh(discordCh)} to hub ${hubState.id}.`));
           }
-          hubState.reticulumCh.sendMessage(msg.author.username, "image", { "src": attachment.url });
+          hubState.reticulumCh.sendMessage(author_name, "image", { "src": attachment.url });
         }
         return;
       }
@@ -842,8 +872,8 @@ async function start() {
           const { url: hubUrl, hub_id: hubId } = await reticulumClient.createHubFromScene(name, sceneId);
           console.log("hubUrl:", hubUrl);
           console.log("hubId:", hubId);
-          console.log("url:", url);
-          console.log("hub_id:", hub_id);
+          //console.log("url:", url);
+          //console.log("hub_id:", hub_id);
           const updatedTopic = topicManager.addHub(discordCh.topic, hubUrl);
           console.log("updatedTopic:", updatedTopic);
           if (await trySetTopic(discordCh, updatedTopic) != null) {
@@ -872,7 +902,15 @@ async function start() {
       case "users": {
         // "!hubs users" == list users
         if (hubState != null) {
-          const names = Object.values(hubState.reticulumCh.getUsers()).map(info => info.metas[0].profile.displayName);
+          const names = Object.values(hubState.reticulumCh.getUsers()).map(
+            info => {
+              let profile = info.metas[0].profile;
+              let name = profile.displayName;
+              if (profile.identityName) {
+                name = `${name} (${profile.identityName})`
+              }
+              return name
+            });
           if (names.length) {
             return discordCh.send(`Users currently in <${hubState.url}>: **${names.join(", ")}**`);
           } else {
