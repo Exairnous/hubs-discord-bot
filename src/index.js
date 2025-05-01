@@ -391,7 +391,7 @@ async function establishBridging(hubState, bridges) {
           console.debug(msg, body);
         }
         if (type === "chat") {
-          webhook.send({content: body, username: whom });
+          webhook.send({content: body, username: whom, allowedMentions: {parse: []} });
         } else if (type === "media") {
           webhook.send({content: body.src, username: whom });
         } else if (type === "photo" || type == "video") {
@@ -529,7 +529,7 @@ async function start() {
 		PresenceManager: 0
 	}), // we have no use for manipulating historical messages
     disabledEvents: DISABLED_EVENTS,
-    disableEveryone: true,
+    //disableEveryone: true,
     intents: [
 		discord.GatewayIntentBits.Guilds,
 		discord.GatewayIntentBits.GuildMessages,
@@ -971,10 +971,10 @@ async function start() {
       case "kill": {
         // todo: probably make this configurable
         const WHITELISTED_USERS = [
-          "339914448032497664", // gfodor
-          "544406895889350676", // elgin
-          "407386567305330688", // liv
-          "146595594155196416" // mqp
+          //"339914448032497664", // gfodor
+          //"544406895889350676", // elgin
+          //"407386567305330688", // liv
+          //"146595594155196416" // mqp
         ];
         if (!WHITELISTED_USERS.includes(msg.author.id)) {
           return discordCh.send("You are not powerful enough to kill the bot.");

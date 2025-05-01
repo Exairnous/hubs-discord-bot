@@ -26,15 +26,15 @@ When you create a Hubs room using the `!hubs create` bot command, you establish 
 
 - People can only join the Hubs room via Discord OAuth, and only if they are a member of the channel that the Hubs room is associated with.
 - When they join, their permissions are based on their Discord permissions 
-  - To enter the room they must have "View Channel" permission
-  - To be a moderator they must have "Kick Members" permission (and "View Channel").
-     - Moderators can kick and mute members in the hubs room. 
-     - Moderators can also create and manipulate objects, draw and share video even if these are turned off in the room settings.
-     - Note: only discord users with verified emails can become moderators
-  - To be a room owner they must have "Manage Channels" (and "Kick Members and "View Channel")
-     - Room owners are able to change the name and scene in the room, modify other room settings, and close the room.
-     - Note: only discord users with verified emails can become room owners
-  - The discord permissions can set either via their discord role globally, or permissions given on the specific channel to that user/role
+  - The "View Channel" permission allows them to enter a room.
+  - The "Kick Members" permission provides them the following capabilities (this basically makes them a moderator):
+     - They can kick and mute members in the hubs room.
+     - They can create and manipulate objects, draw, fly, share video, etc. even if these are turned off in the room settings.
+     - Note: only discord users with verified emails can gain these permissions.
+  - The "Manage Channels" permission provides them the following capabilities (this, along with "Kick Members" makes them the equivalent of a room owner):
+     - They are able to change the name and scene in the room, modify other room settings, and close the room.
+     - Note: only discord users with verified emails can gain these permissions.
+  - The discord permissions can be set either via their discord role globally, or permissions given on the specific channel to that user/role.
 - Their display name in the Hubs room will reflect their Discord display name.
 
 This only happens with rooms that you create using `!hubs create` -- simply bridging a room by putting it in the topic won't cause it to become permission-linked. This linkage will persist for the lifetime of the Hubs room -- if you don't like it, make a new Hubs room.
@@ -48,10 +48,11 @@ Independently of being permission-linked, the bot will detect any Hubs rooms in 
 
 - A notification will appear in the Discord channel when someone joins or leaves the Hubs room, or if administrative stuff happens in the Hubs room.
 - Text chat and images will be bridged from the Discord channel into the Hubs room.
+ - Supported image formats are: PNG, GIF, and JPEG.
 - Text chat and photos will be bridged from the Hubs room into the Discord channel.
 - Links to media (images, videos, models) which are _pinned_ in the Hubs room will be bridged to Discord.
 
-~~Note that you need to set up a webhook for the bot to use in the Discord channel, or it won't be able to post chat from Hubs.~~
+Note: the Hubs bot will set up a webhook for the bot to use in the Discord channel to be able to post chat from Hubs.  You can also set up a global one with the name Hubs and a custom icon, if you prefer.
 
 If you remove the Hubs room from the topic, bridging will stop.
 
@@ -63,7 +64,7 @@ Once the bot is running on your server:
 
 1. Give the bot [appropriate permissions](#permissions) on the channels you want it to run in.
 
-~~2. Create a webhook named "Hubs" in the channels you want it to run in. It will use this webhook to bridge chat and send Hubs status updates.~~
+2. (Optional) Create a webhook named "Hubs" in the channels you want it to run in. It will use this webhook to bridge chat and send Hubs status updates.
 
 3. Try out the bot! Type `!hubs` in a channel the bot is in to see all of the ways you can control the bot. Put your favorite Hubs room into a channel topic to start bridging, or use the `!hubs create` command to create a new room.
 
@@ -77,15 +78,15 @@ General Permissions
 Text Permissions
 - Send Messages
 - Manage Messages - Grant locally per channel not in Developer Portal
-Text Permissions
 - Embed Links
 - Read Message History - Grant locally per channel not in Developer Portal
-Text Permissions
+- Mention @everyone, @here, and All Roles - Grant locally per channel not in Developer Portal
 
 - "Send messages" and "Embed links" are necessary in order to bridge between the Hubs room that is linked to a channel and the messages that are sent within the channel on Discord.
 - "Manage webhooks" is necessary in order for the bot to find and use a webhook for bridging chat.
 - "Manage channels" is necessary in order for the bot to set the channel topic and bridge chat. **Note:** We do not ask for this permission globally when you add the bot to your server, instead we recommend you grant this permission to the bot in specific groups or channels.
 - "Manage messages" and "read message history" are necessary in order for the bot to pin notification messages. Like "manage channels", you should probably grant these for specific groups and channels.
+- "Mention @everyone, @here, and All Roles" is necessary in order for the bot to notify the people present when the scheduled notification messages are posted. Like "manage channels", you should probably grant this for specific groups and channels.
 
 You can and should assign these on a channel-by-channel basis to the bot role after adding the bot to your guild.
 
@@ -106,23 +107,23 @@ To simply run the bot process:
 5. Add redirect URI in the OAuth page and select the bot permissions.
    - Redirect URI: `https://hubs.local:4000/api/v1/oauth/discord`
 
-6. Set the Scope for the OAuth 2 URL Generator to "bot" in the OAuth page and then select the permissions you want the bot to globally have (if you navigate away from this page and then return you will need to redo this step)
+6. Make sure "REQUIRES OAUTH2 CODE GRANT" is disabled in the Bot page.
 
-7. Make sure "REQUIRES OAUTH2 CODE GRANT" is disabled in the Bot page.
+7. Enable the "MESSAGE CONTENT INTENT" in the Privileged Gateway Intents section of the Bot page.
 
-8. Enable the "MESSAGE CONTENT INTENT" in the Privileged Gateway Intents section of the Bot page.
+8. Create an `.env` file with your bot's API token. Include `RETICULUM_HOST={your server}` and `HUBS_HOSTS={your server}` to point it at your local backend. `RETICULUM_HOST={your server}` should point to 'hubs.local:4000' (or the domain name of your Hubs instance, e.g. example.org). You can see the different configuration bits you can override in [`.env.defaults`](./.env.defaults). You can also pass these values as environment variables when you run `npm start`/`npm run local`.
 
-9. Create an `.env` file with your bot's API token. Include `RETICULUM_HOST={your server}` and `HUBS_HOSTS={your server}` to point it at your local backend. `RETICULUM_HOST={your server}` should point to 'hubs.local:4000' (or the domain name of your Hubs instance, e.g. example.org). You can see the different configuration bits you can override in [`.env.defaults`](./.env.defaults). You can also pass these values as environment variables when you run `npm start`/`npm run local`.
+9. Create a random alphanumeric string and set the RETICULUM_BOT_ACCESS_KEY in `.env` to it.
 
-10. Create a random alphanumeric string and set the RETICULUM_BOT_ACCESS_KEY in `.env` to it.
+10. Inside your local reticulum instance in reticulum/config/dev.exs change the configuration for `Ret.DiscordClient` to point to your bot's: `client_id` (Discord Devloper Portal, OAuth page), `client_secret` (Discord Devloper Portal, OAuth page), and `bot_token` (Discord Devloper Portal, Bot page) found inside your discord bot, then change bot_access_key to the value of RETICULUM_BOT_ACCESS_KEY that you set in `.env`.  Add `cdn.discordapp.com` to the img_src cors policy in order to allow Discord images to be rendered in the Hubs chat.  If you're using a Community Edition instance, these fields can be found in `hcce.yaml` (you will need to redeploy your instance with the new values).
 
-11. Inside your local reticulum instance in reticulum/config/dev.exs change the configuration for `Ret.DiscordClient` to point to your bot's: `client_id` (OAuth page), `client_secret` (OAuth page), and `bot_token` (Bot page) found inside your discord bot, along with the RETICULUM_BOT_ACCESS_KEY (this should map to bot_access_key).  Add `cdn.discordapp.com` to the img_src cors policy in order to allow Discord images to be rendered in the Hubs chat.  If you're using a Community Edition instance, these fields can be found in `hcce.yaml` (you will need to redeploy your instance with the new values).
+11. Run `npm run local` or `npm run start` (for Community Edition instances) to start the server, connect to Discord and Reticulum, and operate indefinitely.
 
-12. Run `npm run local` or `npm run start` (for Community Edition instances) to start the server, connect to Discord and Reticulum, and operate indefinitely.
+12. Set the Scope for the OAuth 2 URL Generator to "bot" in the OAuth page of the Discord Devloper Portal and then select the permissions you want the bot to globally have (if you navigate away from this page and then return you will need to redo this step)
 
 13. Copy the URL from the bottom of the OAuth page of your discord bot after everything is set up and you have set your desired permissions and paste it into a new tab to add the bot to your server.
 
-14. [Follow the instructions above](#usage) to set up and use the bot on your Discord guild.
+14. [Follow the instructions above](#usage) to set up and use the bot on your Discord guild/server.
 
 [npm]: https://nodejs.org/en/
 [discord-docs]: https://discordapp.com/developers/docs/intro
