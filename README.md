@@ -42,6 +42,9 @@ This only happens with rooms that you create using `!hubs create` -- simply brid
 > [!IMPORTANT]
 > The instance you're connecting the Hubs Bot to must have the "Disable room creation" toggle disabled, i.e. non-administrators must be allowed to create rooms, when attempting to use `!hubs create` otherwise the room creation will fail.  The toggle can be found in the Rooms tab of the App Settings section of the Admin Panel and can be re-enabled after you have created your room.
 
+> [!IMPORTANT]
+> You are advised not to set a Hubs bot created room to be invite only.  The bot cannot join invite only rooms and if you haven't saved your invite code you may permanently lose access to your room if your authorization expires.
+
 ### Room/channel bridging
 
 Independently of being permission-linked, the bot will detect any Hubs rooms in channel topics in channels that the bot can read and join those rooms, establishing a bridge between the room and the Discord channel. Specifically:
@@ -55,6 +58,8 @@ Independently of being permission-linked, the bot will detect any Hubs rooms in 
 Note: the Hubs bot will set up a webhook for the bot to use in the Discord channel to be able to post chat from Hubs.  You can also set up a global one with the name Hubs and a custom icon, if you prefer.
 
 If you remove the Hubs room from the topic, bridging will stop.
+
+Note2: the Hubs bot can't join/bridge non-permission-linked invite only rooms either, they must be set to `Shared link` in order for the bot to join/bridge them.
 
 ### Great. I want to run this on my Discord server.
 
